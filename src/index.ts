@@ -6,11 +6,16 @@ import { PineconeStore } from 'langchain/vectorstores'
 import { addDocumentToIndex, pinecone } from 'pinecone.js'
 // eslint-disable-next-line import/no-extraneous-dependencies
 import prompts from 'prompts'
-import { custom_qa_template, custom_question_generator_template } from 'prompts.js'
+// import prompts from 'prompts'
+import { custom_qa_template, custom_question_generator_template } from 'llmprompts.js'
 import { qAndAToDoc } from 'utils.js'
+
+
 // import { HNSWLib } from 'langchain/vectorstores'
 
 export const run = async () => {
+
+  
   // check for pinecone env vars
   if (!process.env.PINECONE_ENVIRONMENT || !process.env.PINECONE_API_KEY) {
     throw new Error('Pinecone environment or api key vars missing')
