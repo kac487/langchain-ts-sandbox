@@ -34,9 +34,10 @@ module.exports = {
     "no-console": 0,
     "no-restricted-syntax": 0,
     "no-shadow": 0,
+    "semi": 0,
     "no-underscore-dangle": 0,
     "no-use-before-define": 0,
     "no-useless-constructor": 0,
-    semi: ["error", "always"],
+    // semi: ["error", "never"],
   },
 };
