@@ -1,14 +1,14 @@
-import * as fs from 'fs'
+
 import { ConversationalRetrievalQAChain } from 'langchain/chains'
 import { OpenAIEmbeddings } from 'langchain/embeddings'
 import { OpenAIChat } from 'langchain/llms'
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { PineconeStore } from 'langchain/vectorstores'
-import { pinecone } from 'pinecone.js'
+import { addDocumentToIndex, pinecone } from 'pinecone.js'
 // eslint-disable-next-line import/no-extraneous-dependencies
 import prompts from 'prompts'
+import { custom_qa_template, custom_question_generator_template } from 'prompts.js'
+import { qAndAToDoc } from 'utils.js'
 // import { HNSWLib } from 'langchain/vectorstores'
-
 
 export const run = async () => {
   // check for pinecone env vars
@@ -21,30 +21,48 @@ export const run = async () => {
     modelName: 'gpt-3.5-turbo',
   })
 
-  /* Load in the file we want to do question answering over */
-  // const text = fs.readFileSync('data/state_of_the_union.txt', 'utf8')
+  /* Ask who the user is */
+  const userNameRes = await prompts({
+    type: 'text',
+    name: 'question',
+    message: 'Type your first name:',
+    onState: (state) => {
+      if (state.aborted) {
+        process.nextTick(() => {
+          process.exit(0)
+        })
+      }
+    },
+  })
 
-  /* Split the text into chunks */
-  // const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 })
-  // const docs = await textSplitter.createDocuments([text])
+  const user = userNameRes.question
 
-  /* Create the vectorstore */
-  // const vectorStore = await HNSWLib.fromDocuments(docs, new OpenAIEmbeddings())
-
+  /* ================================== PINECONE =================================== */
   /* Create vectorstore from pinecone index */
   const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX)
   const vectorStore = await PineconeStore.fromExistingIndex(
     new OpenAIEmbeddings(),
-    { pineconeIndex, namespace: 'demostuff' }
+    { pineconeIndex, namespace: process.env.PINECONE_NAMESPACE }
   )
+
+  /* ================================== QA-CHAIN =================================== */
 
   /* Create the chain */
   const chain = ConversationalRetrievalQAChain.fromLLM(
     model,
-    vectorStore.asRetriever()
+    vectorStore.asRetriever(),
+    {
+      questionGeneratorTemplate: custom_question_generator_template,
+      qaTemplate: custom_qa_template,
+    }
   )
 
-  
+  /* ==================================== CHAT ===================================== */
+
+  // Initialize chat history array
+  const chatHistory = []
+
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     /* Ask it a question */
     // prompt command line for input question
@@ -52,26 +70,41 @@ export const run = async () => {
       type: 'text',
       name: 'question',
       message: 'Type a question:',
+      onState: (state) => {
+        if (state.aborted) {
+          process.nextTick(() => {
+            process.exit(0)
+          })
+        }
+      },
     })
 
-    console.log(userRes.question)
+    chatHistory.push(userRes.question)
 
     // const question = 'What was the poem about?'
-    // const res = await chain.call({ userRes.question, chat_history: [] })
-    // const res = await chain.call({ question, chat_history: [] })
-    // console.log(res)
+    const res = await chain.call({
+      question: userRes.question,
+      chat_history: chatHistory,
+    })
+
+    // Print the answer and style it with green text and bold font
+    console.log('\x1b[32m%s\x1b[0m', res.text)
+
+    chatHistory.push(res.text)
+
+    // TODO: update the pinecone index with the latest q and a
+    const chatLogUpdateDoc = qAndAToDoc(
+      user,
+      userRes.question,
+      res.text,
+      Date.now()
+    )
+    addDocumentToIndex(
+      chatLogUpdateDoc,
+      process.env.PINECONE_INDEX,
+      process.env.PINECONE_NAMESPACE
+    )
   }
-
-
-
-
-  // /* Ask it a follow up question */
-  // const chatHistory = question + res.text
-  // const followUpRes = await chain.call({
-  //   question: 'Was that nice?',
-  //   chat_history: chatHistory,
-  // })
-  // console.log(followUpRes)
 }
 
 run()
