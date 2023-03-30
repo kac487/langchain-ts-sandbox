@@ -74,7 +74,7 @@ export const run = async () => {
     const userRes = await prompts({
       type: 'text',
       name: 'question',
-      message: 'Type a question:',
+      message: 'Prompt Input:',
       onState: (state) => {
         if (state.aborted) {
           process.nextTick(() => {
