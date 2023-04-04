@@ -1,5 +1,5 @@
 {
-  "extends": "@tsconfig/recommended",
+  // "extends": "@tsconfig/recommended",
   "compilerOptions": {
     "outDir": "dist",
     "lib": ["ES2021", "ES2022.Object", "DOM"],
